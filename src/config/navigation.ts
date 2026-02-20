@@ -16,18 +16,23 @@ export const navRoutes: NavRoute[] = [
   { name: "Relatórios", path: "/dashboard/relatorios", minimumRole: ROLES.STAFF },
   { name: "Financeiro", path: "/dashboard/financeiro", minimumRole: ROLES.CEO },
   { name: "Usuários", path: "/dashboard/usuarios", minimumRole: ROLES.GESTOR },
-  { name: "Configurações", path: "/dashboard/config", minimumRole: ROLES.CEO },
+  { name: "Configurações", path: "/dashboard/config", minimumRole: ROLES.GESTOR },
 ];
 
 /**
  * Retorna as rotas visíveis para o usuário com base no role.
  * Financeiro: apenas CEO.
+ * Configurações: CEO e GESTOR (mesma regra).
  */
 export function getVisibleRoutes(userRole: string | null | undefined): NavRoute[] {
   const role = userRole?.toUpperCase();
+  const canAccessConfig = role === ROLES.CEO || role === ROLES.GESTOR;
   return navRoutes.filter((route) => {
     if (route.path === "/dashboard/financeiro") {
       return role === ROLES.CEO;
+    }
+    if (route.path === "/dashboard/config") {
+      return canAccessConfig;
     }
     return hasPermission(userRole, route.minimumRole);
   });

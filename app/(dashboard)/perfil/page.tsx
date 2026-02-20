@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PerfilForm } from "./PerfilForm";
-import { SecuritySection } from "./SecuritySection";
-import { BackupCodesSection } from "./BackupCodesSection";
 
 export default function PerfilPage() {
   const router = useRouter();
@@ -25,7 +23,6 @@ export default function PerfilPage() {
   const [stateUf, setStateUf] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [mfaEnabled, setMfaEnabled] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -66,7 +63,6 @@ export default function PerfilPage() {
         setNeighborhood((data.neighborhood ?? "") as string);
         setCity((data.city ?? "") as string);
         setStateUf((data.state ?? "") as string);
-        setMfaEnabled(!!data.mfa_enabled);
 
         if (data.avatar_url) {
           const { data: signed } = await supabase.storage
@@ -128,15 +124,6 @@ export default function PerfilPage() {
           email={email}
           avatarUrl={avatarUrl}
         />
-        <div className="mt-8 border-t border-white/10 pt-8">
-          <SecuritySection
-            mfaEnabled={mfaEnabled}
-            onMfaChange={setMfaEnabled}
-          />
-        </div>
-        <div className="mt-8 border-t border-white/10 pt-8">
-          <BackupCodesSection />
-        </div>
       </div>
     </div>
   );

@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/Input";
 const inputClasses =
   "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50";
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
 function formatCpf(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 11);
   const part1 = digits.slice(0, 3);
@@ -240,6 +242,11 @@ export function PerfilForm({
       let newAvatarUrl: string | null = null;
 
       if (avatarFile && avatarFile.size > 0) {
+        if (avatarFile.size > MAX_FILE_SIZE) {
+          setError("Imagem deve ter no máximo 5MB.");
+          setLoading(false);
+          return;
+        }
         newAvatarUrl = (await uploadAvatar(avatarFile)) ?? null;
       }
 
@@ -516,7 +523,7 @@ export function PerfilForm({
               className={inputClasses}
             />
             <p className="mt-1 text-xs text-slate-500">
-              Formatos suportados: JPG, PNG. Tamanho máximo recomendado 5MB.
+              Imagem deve ter no máximo 5MB.
             </p>
           </div>
         </div>

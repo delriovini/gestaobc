@@ -2,9 +2,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/with-role";
 import { ROLES } from "@/lib/rbac";
-import { TreinamentosAdminContent } from "../treinamentos/admin/TreinamentosAdminContent";
-import { GamificacaoAdminContent } from "./gamificacao/GamificacaoAdminContent";
-import { RelatoriosAdminContent } from "./relatorios/RelatoriosAdminContent";
 
 type ConfigPageProps = {
   searchParams: Promise<{ tab?: string; ano?: string; mes?: string }>;
@@ -20,6 +17,29 @@ export default async function ConfigPage({ searchParams }: ConfigPageProps) {
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user!.id).single();
   const apelido = (profile?.full_name && String(profile.full_name).trim()) || user?.email?.split("@")[0] || "Usuário";
+
+  let tabContent: React.ReactNode = null;
+  if (activeTab === "treinamentos") {
+    const { TreinamentosAdminContent } = await import("./treinamentos/TreinamentosTabContent");
+    tabContent = <TreinamentosAdminContent />;
+  } else if (activeTab === "gamificacao") {
+    const { GamificacaoAdminContent } = await import("./gamificacao/GamificacaoAdminContent");
+    tabContent = <GamificacaoAdminContent />;
+  } else if (activeTab === "relatorios") {
+    const { RelatoriosAdminContent } = await import("./relatorios/RelatoriosAdminContent");
+    tabContent = (
+      <RelatoriosAdminContent
+        ano={params.ano != null ? parseInt(params.ano, 10) : null}
+        mes={params.mes != null ? parseInt(params.mes, 10) : null}
+      />
+    );
+  } else if (activeTab === "geral") {
+    tabContent = (
+      <div className="rounded-xl border border-white/10 bg-slate-900/50 p-6 shadow-lg backdrop-blur-sm">
+        <p className="text-slate-400">Configurações gerais do sistema.</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -74,21 +94,7 @@ export default async function ConfigPage({ searchParams }: ConfigPageProps) {
         </nav>
       </div>
 
-      <div className="mt-6">
-        {activeTab === "treinamentos" && <TreinamentosAdminContent />}
-        {activeTab === "gamificacao" && <GamificacaoAdminContent />}
-        {activeTab === "relatorios" && (
-          <RelatoriosAdminContent
-            ano={params.ano != null ? parseInt(params.ano, 10) : null}
-            mes={params.mes != null ? parseInt(params.mes, 10) : null}
-          />
-        )}
-        {activeTab === "geral" && (
-          <div className="rounded-xl border border-white/10 bg-slate-900/50 p-6 shadow-lg backdrop-blur-sm">
-            <p className="text-slate-400">Configurações gerais do sistema.</p>
-          </div>
-        )}
-      </div>
+      <div className="mt-6">{tabContent}</div>
     </div>
   );
 }

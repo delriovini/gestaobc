@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ensureActiveUser } from "@/lib/ensure-active-user";
 
 const AVATARS_BUCKET = "avatars";
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5MB
 
 export async function updateProfile(formData: FormData) {
   const supabase = await createClient();
@@ -32,6 +33,9 @@ export async function updateProfile(formData: FormData) {
   }
 
   if (avatarFile && avatarFile.size > 0) {
+    if (avatarFile.size > MAX_AVATAR_SIZE) {
+      return { error: new Error("Imagem deve ter no máximo 5MB.") };
+    }
     const ext = avatarFile.name.split(".").pop()?.toLowerCase() || "jpg";
     const fileName = `${user.id}-${Date.now()}.${ext}`;
 
