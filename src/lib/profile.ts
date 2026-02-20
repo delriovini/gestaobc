@@ -120,11 +120,11 @@ export async function updateProfile(data: ProfileUpdate) {
   return { error: null };
 }
 
-const MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_AVATAR_SIZE = 1 * 1024 * 1024; // 1MB
 
 export async function uploadAvatar(file: File): Promise<string | undefined> {
   if (file.size > MAX_AVATAR_SIZE) {
-    throw new Error("Imagem deve ter no máximo 5MB.");
+    throw new Error("Imagem deve ter no máximo 1MB.");
   }
 
   const supabase = await createClient();

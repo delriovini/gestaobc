@@ -48,17 +48,47 @@ export default function RegisterPage() {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorIsPassword, setErrorIsPassword] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  function isPasswordRelatedError(message: string): boolean {
+    const lower = message.toLowerCase();
+    const terms = [
+      "password",
+      "senha",
+      "character",
+      "characters",
+      "length",
+      "minimum",
+      "mínimo",
+      "uppercase",
+      "maiúscula",
+      "lowercase",
+      "minúscula",
+      "number",
+      "número",
+      "digit",
+      "symbol",
+      "símbolo",
+      "policy",
+      "política",
+      "weak",
+      "fraca",
+    ];
+    return terms.some((t) => lower.includes(t));
+  }
 
   const siteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY ?? "";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setErrorIsPassword(false);
     setLoading(true);
 
     if (!captchaToken) {
       setError("Complete o captcha para continuar.");
+      setErrorIsPassword(false);
       setLoading(false);
       return;
     }
@@ -66,6 +96,7 @@ export default function RegisterPage() {
     const fullNameTrimmed = fullName.trim();
     if (!fullNameTrimmed) {
       setError("Informe o apelido.");
+      setErrorIsPassword(false);
       setLoading(false);
       return;
     }
@@ -73,17 +104,20 @@ export default function RegisterPage() {
     const phoneDigits = phone.replace(/\D/g, "");
     if (!phoneDigits || phoneDigits.length < 10) {
       setError("Informe um WhatsApp válido.");
+      setErrorIsPassword(false);
       setLoading(false);
       return;
     }
 
     if (password !== confirmPassword) {
       setError("As senhas não coincidem.");
+      setErrorIsPassword(true);
       setLoading(false);
       return;
     }
     if (password.length < 6) {
       setError("A senha deve ter no mínimo 6 caracteres.");
+      setErrorIsPassword(true);
       setLoading(false);
       return;
     }
@@ -104,11 +138,13 @@ export default function RegisterPage() {
       });
 
       if (signUpError) {
-        setError(
-          signUpError.message.includes("already registered")
+        const message =
+          signUpError.message.includes("already registered") ||
+          signUpError.message.includes("already been registered")
             ? "Este email já está cadastrado. Faça login ou recupere sua senha."
-            : signUpError.message
-        );
+            : signUpError.message;
+        setError(message);
+        setErrorIsPassword(isPasswordRelatedError(signUpError.message));
         setLoading(false);
         return;
       }
@@ -116,6 +152,7 @@ export default function RegisterPage() {
       const user = data?.user;
       if (!user) {
         setError("Não foi possível criar a conta. Tente novamente.");
+        setErrorIsPassword(false);
         setLoading(false);
         return;
       }
@@ -136,6 +173,7 @@ export default function RegisterPage() {
         setError(
           "Conta criada, mas houve um erro ao salvar o perfil. Entre em contato com o suporte."
         );
+        setErrorIsPassword(false);
         setLoading(false);
         return;
       }
@@ -143,8 +181,11 @@ export default function RegisterPage() {
       setCaptchaToken(null);
       await supabase.auth.signOut();
       setSuccess(true);
-    } catch {
-      setError("Ocorreu um erro inesperado. Tente novamente mais tarde.");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Ocorreu um erro inesperado. Tente novamente mais tarde.";
+      setError(message);
+      setErrorIsPassword(isPasswordRelatedError(message));
     } finally {
       setLoading(false);
     }
@@ -217,7 +258,7 @@ export default function RegisterPage() {
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {error && (
+            {error && !errorIsPassword && (
               <div
                 role="alert"
                 className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300"
@@ -281,19 +322,42 @@ export default function RegisterPage() {
                 className={inputClasses}
               />
             </div>
-            <Input
-              label="Senha"
-              name="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Mínimo 6 caracteres"
-              required
-              disabled={loading}
-              className={inputClasses}
-              autoComplete="new-password"
-              minLength={6}
-            />
+            <div>
+              <Input
+                label="Senha"
+                name="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
+                required
+                disabled={loading}
+                className={inputClasses}
+                autoComplete="new-password"
+                minLength={6}
+              />
+              {error && errorIsPassword && (
+                <div
+                  role="alert"
+                  className="mt-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+                >
+                  <p className="flex items-center gap-2">
+                    <svg
+                      className="h-4 w-4 flex-shrink-0"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    {error}
+                  </p>
+                </div>
+              )}
+            </div>
             <Input
               label="Confirmar senha"
               name="confirmPassword"
