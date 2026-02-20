@@ -49,14 +49,16 @@ export async function updateSession(request: NextRequest) {
       return supabaseResponse;
     }
 
-    // 2) Verificação de status logo após validar sessão
+    // 2) Mesma regra do layout: só ACTIVE pode acessar
     const { data: profile } = await supabase
       .from("profiles")
       .select("status")
       .eq("id", user.id)
       .single();
 
-    if (!profile || profile.status !== "ACTIVE") {
+    const statusNorm =
+      profile?.status != null ? String(profile.status).trim().toUpperCase() : "";
+    if (!profile || statusNorm !== "ACTIVE") {
       await supabase.auth.signOut();
       return NextResponse.redirect(new URL("/login?error=inactive", request.url));
     }

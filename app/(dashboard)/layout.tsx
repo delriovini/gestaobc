@@ -64,9 +64,7 @@ export default async function DashboardLayout({
 
   const statusNorm =
     profile?.status != null ? String(profile.status).trim().toUpperCase() : "";
-  const isApproved =
-    profile != null &&
-    (statusNorm === "" || statusNorm === "APROVADO");
+  const isApproved = profile != null && statusNorm === "ACTIVE";
 
   if (!isApproved) {
     return (
