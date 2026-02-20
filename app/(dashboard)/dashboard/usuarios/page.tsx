@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { normalizeRole, ROLES, hasPermission } from "@/lib/rbac";
 import { ApproveRejectButtons } from "./ApproveRejectButtons";
+import { toggleUserStatusForm } from "./actions";
 
 export default async function UsuariosPage() {
   const supabase = await createServerSupabaseClient();
@@ -111,6 +112,10 @@ export default async function UsuariosPage() {
                   ? "Aprovado"
                   : userRow.status === "REJEITADO"
                   ? "Rejeitado"
+                  : userRow.status === "ACTIVE"
+                  ? "Ativo"
+                  : userRow.status === "INACTIVE"
+                  ? "Inativo"
                   : userRow.status ?? "—";
               const isPending = userRow.status === "PENDENTE";
 
@@ -121,18 +126,32 @@ export default async function UsuariosPage() {
                   <td className="px-4 py-3 text-sm text-slate-300">{userRow.email}</td>
                   <td className="px-4 py-3 text-sm text-slate-400">{statusLabel}</td>
                   <td className="px-4 py-3 text-right text-sm">
-                    {isPending ? (
-                      <ApproveRejectButtons userId={userRow.id} />
-                    ) : userRow.id ? (
-                      <Link
-                        href={`/dashboard/usuarios/${userRow.id}`}
-                        className="inline-flex items-center rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-cyan-600"
-                      >
-                        Editar
-                      </Link>
-                    ) : (
-                      <span className="text-slate-500">—</span>
-                    )}
+                    <div className="flex items-center justify-end gap-2">
+                      {isPending ? (
+                        <ApproveRejectButtons userId={userRow.id} />
+                      ) : (
+                        <>
+                          <form action={toggleUserStatusForm} className="inline">
+                            <input type="hidden" name="userId" value={userRow.id} />
+                            <input type="hidden" name="currentStatus" value={userRow.status ?? ""} />
+                            <button
+                              type="submit"
+                              className="rounded-lg bg-red-600 px-3 py-1 text-xs text-white transition hover:bg-red-500"
+                            >
+                              {userRow.status === "ACTIVE" ? "Inativar" : "Ativar"}
+                            </button>
+                          </form>
+                          {userRow.id ? (
+                            <Link
+                              href={`/dashboard/usuarios/${userRow.id}`}
+                              className="inline-flex items-center rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-cyan-600"
+                            >
+                              Editar
+                            </Link>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

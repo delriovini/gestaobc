@@ -49,6 +49,18 @@ export async function updateSession(request: NextRequest) {
       return supabaseResponse;
     }
 
+    // 2) Verificação de status logo após validar sessão
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("status")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile || profile.status !== "ACTIVE") {
+      await supabase.auth.signOut();
+      return NextResponse.redirect(new URL("/login?error=inactive", request.url));
+    }
+
     // Proteção de rotas por role é feita nas páginas (profiles.role), não no JWT.
 
     // Permitir acesso normal

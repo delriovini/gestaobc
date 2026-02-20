@@ -5,6 +5,7 @@ import {
   createServerSupabaseAdminClient,
 } from "@/lib/supabaseServer";
 import { normalizeRole, ROLES, hasPermission } from "@/lib/rbac";
+import { ensureActiveUser } from "@/lib/ensure-active-user";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,8 @@ async function updateUserRole(formData: FormData) {
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
+
+  await ensureActiveUser(supabase, user.id);
 
   const { data: profile } = await supabase
     .from("profiles")

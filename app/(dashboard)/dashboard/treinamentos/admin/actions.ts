@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { normalizeRole, ROLES } from "@/lib/rbac";
+import { ensureActiveUser } from "@/lib/ensure-active-user";
 
 export async function createTraining(formData: FormData) {
   const supabase = await createServerSupabaseClient();
@@ -14,6 +15,8 @@ export async function createTraining(formData: FormData) {
   if (!user) {
     throw new Error("Usuário não autenticado ao criar treinamento");
   }
+
+  await ensureActiveUser(supabase, user.id);
 
   const title = formData.get("title") as string | null;
   const description = formData.get("description") as string | null;
@@ -74,6 +77,8 @@ export async function deleteTraining(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuário não autenticado");
+
+  await ensureActiveUser(supabase, user.id);
 
   const { data: profile } = await supabase
     .from("profiles")

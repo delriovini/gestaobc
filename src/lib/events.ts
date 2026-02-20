@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/database.types";
+import { ensureActiveUser } from "@/lib/ensure-active-user";
 
 export type Event = Database["public"]["Tables"]["events"]["Row"];
 export type EventWithProfiles = Event & {
@@ -156,6 +157,8 @@ export async function getEvents(month: number, year: number): Promise<EventWithP
     throw new Error("Usuário não autenticado");
   }
 
+  await ensureActiveUser(supabase, user.id);
+
   const firstDay = getFirstDayOfMonth(month, year);
   const lastDay = getLastDayOfMonth(month, year);
 
@@ -198,6 +201,8 @@ export async function getEventsInRange(startDate: string, endDate: string): Prom
   } = await supabase.auth.getUser();
 
   if (!user) return [];
+
+  await ensureActiveUser(supabase, user.id);
 
   const [eventsRes, profilesRes] = await Promise.all([
     supabase
@@ -268,6 +273,8 @@ export async function createEvent(data: CreateEventData) {
     return { data: null, error: new Error("Usuário não autenticado") };
   }
 
+  await ensureActiveUser(supabase, user.id);
+
   if (!data.title?.trim()) {
     return { data: null, error: new Error("Título é obrigatório") };
   }
@@ -329,6 +336,8 @@ export async function updateEvent(id: string, data: UpdateEventData) {
   if (!user) {
     return { data: null, error: new Error("Usuário não autenticado") };
   }
+
+  await ensureActiveUser(supabase, user.id);
 
   const updates: Record<string, unknown> = {};
   if (data.title !== undefined) updates.title = data.title.trim();
@@ -397,6 +406,8 @@ export async function deleteEvent(id: string) {
   if (!user) {
     return { error: new Error("Usuário não autenticado") };
   }
+
+  await ensureActiveUser(supabase, user.id);
 
   const { error } = await supabase.from("events").delete().eq("id", id);
 

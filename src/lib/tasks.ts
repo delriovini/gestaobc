@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeRole, ROLES } from "@/lib/rbac";
+import { ensureActiveUser } from "@/lib/ensure-active-user";
 
 export type TaskStatus = "todo" | "in_progress" | "done";
 
@@ -50,6 +51,8 @@ export async function getTasks(supabaseInstance?: SupabaseClient) {
   } = await supabase.auth.getUser();
 
   if (!user) return [];
+
+  await ensureActiveUser(supabase, user.id);
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -154,6 +157,8 @@ export async function createTask(payload: CreateTaskOptions) {
     throw new Error("Usuário não autenticado");
   }
 
+  await ensureActiveUser(supabase, user.id);
+
   const assignedTo = payload.assigned_to ?? user.id;
 
   const { data, error } = await supabase
@@ -198,6 +203,8 @@ export async function updateTask(taskId: string, data: UpdateTaskData) {
     return { data: null, error: new Error("Usuário não autenticado") };
   }
 
+  await ensureActiveUser(supabase, user.id);
+
   const updates: Record<string, unknown> = {};
   if (data.title !== undefined) updates.title = data.title.trim();
   if (data.description !== undefined) updates.description = data.description ?? null;
@@ -239,6 +246,8 @@ export async function updateTaskStatus(taskId: string, status: TaskStatus) {
     return { data: null, error: new Error("Usuário não autenticado") };
   }
 
+  await ensureActiveUser(supabase, user.id);
+
   const { error } = await supabase
     .from("tasks")
     .update({ status: toDbStatus(status) })
@@ -260,6 +269,8 @@ export async function deleteTask(taskId: string) {
   if (!user) {
     return { error: new Error("Usuário não autenticado") };
   }
+
+  await ensureActiveUser(supabase, user.id);
 
   const { error } = await supabase.from("tasks").delete().eq("id", taskId);
 

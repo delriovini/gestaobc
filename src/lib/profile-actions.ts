@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { ensureActiveUser } from "@/lib/ensure-active-user";
 
 const AVATARS_BUCKET = "avatars";
 
@@ -14,6 +15,8 @@ export async function updateProfile(formData: FormData) {
   if (!user) {
     return { error: new Error("Usuário não autenticado") };
   }
+
+  await ensureActiveUser(supabase, user.id);
 
   const nomeCompleto = (formData.get("nome_completo") as string)?.trim();
   const fullName = (formData.get("full_name") as string)?.trim();

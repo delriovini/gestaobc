@@ -15,18 +15,22 @@ export function ApproveRejectButtons({ userId }: ApproveRejectButtonsProps) {
 
   async function handleApprove() {
     setLoading("approve");
-    const result = await updateUserStatus(userId, "APROVADO");
-    setLoading(null);
-    if (result.error) return;
-    router.refresh();
+    try {
+      await updateUserStatus(userId, "APROVADO");
+      router.refresh();
+    } finally {
+      setLoading(null);
+    }
   }
 
   async function handleReject() {
     setLoading("reject");
-    const result = await updateUserStatus(userId, "REJEITADO");
-    setLoading(null);
-    if (result.error) return;
-    router.refresh();
+    try {
+      await updateUserStatus(userId, "REJEITADO");
+      router.refresh();
+    } finally {
+      setLoading(null);
+    }
   }
 
   return (

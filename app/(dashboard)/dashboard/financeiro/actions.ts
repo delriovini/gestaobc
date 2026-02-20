@@ -3,11 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeRole, ROLES } from "@/lib/rbac";
+import { ensureActiveUser } from "@/lib/ensure-active-user";
 
 async function requireCEO() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Não autenticado.");
+  await ensureActiveUser(supabase, user.id);
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")

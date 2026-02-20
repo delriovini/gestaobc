@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { syncBirthdayEvent } from "@/lib/calendar-events";
+import { ensureActiveUser } from "@/lib/ensure-active-user";
 
 export interface ProfileData {
   id: string;
@@ -71,6 +72,8 @@ export async function updateProfile(data: ProfileUpdate) {
     return { error: new Error("Usuário não autenticado") };
   }
 
+  await ensureActiveUser(supabase, user.id);
+
   const updates: ProfileUpdate = {};
 
   if (data.nome_completo !== undefined) updates.nome_completo = data.nome_completo ?? null;
@@ -122,6 +125,8 @@ export async function uploadAvatar(file: File): Promise<string | undefined> {
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuário não autenticado");
+
+  await ensureActiveUser(supabase, user.id);
 
   const filePath = `${user.id}/avatar.jpg`;
 

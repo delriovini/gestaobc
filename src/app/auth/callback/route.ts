@@ -26,6 +26,13 @@ export async function GET(request: Request) {
     .eq("id", user.id)
     .single();
 
+  if (profile && profile.status !== "ACTIVE") {
+    await supabase.auth.signOut();
+    return NextResponse.redirect(
+      new URL("/login?error=inactive", request.url)
+    );
+  }
+
   let currentProfile = profile;
 
   if (!profile) {

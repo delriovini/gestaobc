@@ -4,11 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
 import { normalizeRole, ROLES } from "@/lib/rbac";
+import { ensureActiveUser } from "@/lib/ensure-active-user";
 
 function requireCeoOrGestor(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>) {
   return async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
+    await ensureActiveUser(supabase, user.id);
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
     const role = normalizeRole(profile?.role ?? null);
     if (!role || (role !== ROLES.CEO && role !== ROLES.GESTOR)) {

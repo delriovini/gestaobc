@@ -1,6 +1,7 @@
 "use server";
 
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
+import { ensureActiveUser } from "@/lib/ensure-active-user";
 
 export async function saveBackupCodeHashes(hashes: string[]) {
   if (!hashes.length || hashes.length > 16) {
@@ -13,6 +14,8 @@ export async function saveBackupCodeHashes(hashes: string[]) {
   } = await supabase.auth.getUser();
 
   if (!user) return { error: "Não autenticado." };
+
+  await ensureActiveUser(supabase, user.id);
 
   const { error: deleteError } = await supabase
     .from("backup_codes")

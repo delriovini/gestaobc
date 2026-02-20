@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
+import { ensureActiveUser } from "@/lib/ensure-active-user";
 
 export async function logMfaAttempt(success: boolean) {
   const supabase = await createServerSupabaseClient();
@@ -10,6 +11,8 @@ export async function logMfaAttempt(success: boolean) {
   } = await supabase.auth.getUser();
 
   if (!user) return;
+
+  await ensureActiveUser(supabase, user.id);
 
   const headersList = await headers();
   const ipAddress =
@@ -29,6 +32,8 @@ export async function recordMfaFailure(): Promise<{ justLocked?: boolean }> {
   } = await supabase.auth.getUser();
 
   if (!user) return {};
+
+  await ensureActiveUser(supabase, user.id);
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -62,6 +67,8 @@ export async function recordMfaSuccess() {
 
   if (!user) return;
 
+  await ensureActiveUser(supabase, user.id);
+
   await supabase
     .from("profiles")
     .update({ mfa_failed_attempts: 0 })
@@ -78,6 +85,8 @@ export async function getMfaLockStatus(): Promise<{
   } = await supabase.auth.getUser();
 
   if (!user) return { locked: false, lockedUntil: null };
+
+  await ensureActiveUser(supabase, user.id);
 
   const { data: profile } = await supabase
     .from("profiles")

@@ -1,56 +1,34 @@
 "use server";
 
+import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import {
-  createServerSupabaseClient,
-  createServerSupabaseAdminClient,
-} from "@/lib/supabaseServer";
-import { normalizeRole, ROLES, hasPermission } from "@/lib/rbac";
+import { ensureActiveUser } from "@/lib/ensure-active-user";
 
-export async function updateUserStatus(
-  userId: string,
-  status: "APROVADO" | "REJEITADO"
-) {
-  const supabase = await createServerSupabaseClient();
+export async function updateUserStatus(userId: string, newStatus: string) {
+  const supabase = await createClient();
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user) throw new Error("Acesso não autorizado.");
+  await ensureActiveUser(supabase, user.id);
 
-  if (!user) return { error: "Não autenticado" };
-
-  const { data: profile } = await supabase
+  const { error } = await supabase
     .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+    .update({ status: newStatus })
+    .eq("id", userId);
 
-  const currentRole = normalizeRole(profile?.role ?? null);
-  if (!hasPermission(currentRole, ROLES.GESTOR)) {
-    return { error: "Sem permissão" };
-  }
-
-  const admin = createServerSupabaseAdminClient();
-  const client = admin ?? supabase;
-
-  if (status === "APROVADO") {
-    const { error: rpcError } = await supabase.rpc("approve_user", {
-      p_target_user_id: userId,
-    });
-    if (rpcError) {
-      const { error: updateError } = await client
-        .from("profiles")
-        .update({ status: "APROVADO" })
-        .eq("id", userId);
-      if (updateError) return { error: updateError.message };
-    }
-  } else {
-    const { error } = await client
-      .from("profiles")
-      .update({ status: "REJEITADO" })
-      .eq("id", userId);
-    if (error) return { error: error.message };
+  if (error) {
+    throw new Error(error.message);
   }
 
   revalidatePath("/dashboard/usuarios");
-  return { success: true };
+}
+
+export async function toggleUserStatusForm(formData: FormData) {
+  const userId = formData.get("userId") as string | null;
+  const currentStatus = formData.get("currentStatus") as string | null;
+  if (!userId) return;
+  const newStatus = currentStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+  await updateUserStatus(userId, newStatus);
 }

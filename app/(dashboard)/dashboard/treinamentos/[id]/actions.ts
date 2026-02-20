@@ -6,6 +6,7 @@ import {
   createServerSupabaseAdminClient,
 } from "@/lib/supabaseServer";
 import { normalizeRole, ROLES } from "@/lib/rbac";
+import { ensureActiveUser } from "@/lib/ensure-active-user";
 
 export async function addComment(formData: FormData) {
   const training_id = formData.get("training_id") as string | null;
@@ -19,6 +20,8 @@ export async function addComment(formData: FormData) {
   } = await supabase.auth.getUser();
 
   if (!user) return;
+
+  await ensureActiveUser(supabase, user.id);
 
   const { error } = await supabase.from("training_comments").insert({
     training_id,
@@ -48,6 +51,8 @@ export async function deleteComment(formData: FormData) {
   if (!user) {
     throw new Error("Usuário não autenticado");
   }
+
+  await ensureActiveUser(supabase, user.id);
 
   const { data: profile } = await supabase
     .from("profiles")

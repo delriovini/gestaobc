@@ -2,12 +2,19 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabaseServer";
+import { ensureActiveUser } from "@/lib/ensure-active-user";
 
 export async function deleteTraining(formData: FormData) {
   const id = formData.get("id") as string | null;
   if (!id) return;
 
   const supabase = await createServerSupabaseClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Acesso não autorizado.");
+  await ensureActiveUser(supabase, user.id);
 
   const { error } = await supabase.from("trainings").delete().eq("id", id);
 
@@ -33,6 +40,12 @@ export async function updateTraining(formData: FormData) {
     durationRaw && !Number.isNaN(Number(durationRaw)) ? Number(durationRaw) : null;
 
   const supabase = await createServerSupabaseClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Acesso não autorizado.");
+  await ensureActiveUser(supabase, user.id);
 
   const { error } = await supabase
     .from("trainings")
