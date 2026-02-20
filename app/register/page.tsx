@@ -27,18 +27,6 @@ function Logo() {
   );
 }
 
-function formatCpf(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 11);
-  const part1 = digits.slice(0, 3);
-  const part2 = digits.slice(3, 6);
-  const part3 = digits.slice(6, 9);
-  const part4 = digits.slice(9, 11);
-  if (digits.length <= 3) return part1;
-  if (digits.length <= 6) return `${part1}.${part2}`;
-  if (digits.length <= 9) return `${part1}.${part2}.${part3}`;
-  return `${part1}.${part2}.${part3}-${part4}`;
-}
-
 function formatWhatsapp(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 11);
   const d1 = digits.slice(0, 2);
@@ -49,62 +37,12 @@ function formatWhatsapp(value: string): string {
   return `(${d1}) ${d2}-${d3}`;
 }
 
-function formatCep(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 8);
-  const p1 = digits.slice(0, 5);
-  const p2 = digits.slice(5, 8);
-  if (digits.length <= 5) return p1;
-  return `${p1}-${p2}`;
-}
-
-function validateCPF(value: string | null | undefined): boolean {
-  if (!value) return true;
-  const cpf = value.replace(/\D/g, "");
-  if (cpf.length !== 11) return false;
-  if (/^(\d)\1{10}$/.test(cpf)) return false;
-  const nums = cpf.split("").map((d) => parseInt(d, 10));
-  let sum = 0;
-  for (let i = 0; i < 9; i++) sum += nums[i] * (10 - i);
-  let firstCheck = (sum * 10) % 11;
-  if (firstCheck === 10) firstCheck = 0;
-  if (firstCheck !== nums[9]) return false;
-  sum = 0;
-  for (let i = 0; i < 10; i++) sum += nums[i] * (11 - i);
-  let secondCheck = (sum * 10) % 11;
-  if (secondCheck === 10) secondCheck = 0;
-  return secondCheck === nums[10];
-}
-
-function isAtLeast16YearsOld(dateString: string | null | undefined): boolean {
-  if (!dateString) return true;
-  const birth = new Date(dateString);
-  if (Number.isNaN(birth.getTime())) return false;
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const monthDiff = today.getMonth() - birth.getMonth();
-  const dayDiff = today.getDate() - birth.getDate();
-  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) age -= 1;
-  return age >= 16;
-}
-
 type ProfilesUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 
 export default function RegisterPage() {
-  const [nomeCompleto, setNomeCompleto] = useState("");
-  const [apelido, setApelido] = useState("");
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [cpf, setCpf] = useState("");
-  const [rg, setRg] = useState("");
-  const [birthDate, setBirthDate] = useState("");
-  const [whatsapp, setWhatsapp] = useState("");
-  const [cep, setCep] = useState("");
-  const [street, setStreet] = useState("");
-  const [number, setNumber] = useState("");
-  const [complement, setComplement] = useState("");
-  const [neighborhood, setNeighborhood] = useState("");
-  const [city, setCity] = useState("");
-  const [stateUf, setStateUf] = useState("");
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
@@ -113,23 +51,6 @@ export default function RegisterPage() {
   const [success, setSuccess] = useState(false);
 
   const siteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY ?? "";
-
-  async function handleCepBlur() {
-    const rawCep = (cep || "").replace(/\D/g, "");
-    if (rawCep.length !== 8) return;
-    try {
-      const response = await fetch(`https://viacep.com.br/ws/${rawCep}/json/`);
-      if (!response.ok) return;
-      const data = await response.json() as { erro?: boolean; logradouro?: string; bairro?: string; localidade?: string; uf?: string };
-      if (data.erro) return;
-      if (data.logradouro) setStreet(data.logradouro);
-      if (data.bairro) setNeighborhood(data.bairro);
-      if (data.localidade) setCity(data.localidade);
-      if (data.uf) setStateUf(data.uf);
-    } catch {
-      // usuário pode preencher manualmente
-    }
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -142,9 +63,16 @@ export default function RegisterPage() {
       return;
     }
 
-    const nomeCompletoVal = nomeCompleto.trim();
-    if (!nomeCompletoVal) {
-      setError("Informe o nome completo.");
+    const fullNameTrimmed = fullName.trim();
+    if (!fullNameTrimmed) {
+      setError("Informe o apelido.");
+      setLoading(false);
+      return;
+    }
+
+    const phoneDigits = phone.replace(/\D/g, "");
+    if (!phoneDigits || phoneDigits.length < 10) {
+      setError("Informe um WhatsApp válido.");
       setLoading(false);
       return;
     }
@@ -160,23 +88,6 @@ export default function RegisterPage() {
       return;
     }
 
-    const cpfDigits = cpf.replace(/\D/g, "") || null;
-    if (cpfDigits && !validateCPF(cpfDigits)) {
-      setError("CPF inválido. Verifique os dígitos.");
-      setLoading(false);
-      return;
-    }
-
-    if (!isAtLeast16YearsOld(birthDate || null)) {
-      setError("Você precisa ter pelo menos 16 anos para se cadastrar.");
-      setLoading(false);
-      return;
-    }
-
-    const apelidoVal = apelido.trim() || null;
-    const whatsappDigits = whatsapp.replace(/\D/g, "") || null;
-    const cepDigits = cep.replace(/\D/g, "") || null;
-
     try {
       const supabase = createClient();
 
@@ -186,10 +97,8 @@ export default function RegisterPage() {
         options: {
           captchaToken,
           data: {
-            full_name: apelidoVal,
-            role: "STAFF",
-            phone: whatsappDigits ?? undefined,
-            nome: nomeCompletoVal,
+            full_name: fullNameTrimmed,
+            phone: phoneDigits,
           },
         },
       });
@@ -211,32 +120,11 @@ export default function RegisterPage() {
         return;
       }
 
-      let avatarUrl: string | null = null;
-      if (avatarFile && avatarFile.size > 0) {
-        const filePath = `${user.id}/avatar.jpg`;
-        const { error: uploadErr } = await supabase.storage
-          .from("avatars")
-          .upload(filePath, avatarFile, { upsert: true });
-        if (!uploadErr) avatarUrl = filePath;
-      }
-
       const profileUpdate: ProfilesUpdate = {
-        full_name: apelidoVal,
-        nome_completo: nomeCompletoVal,
+        full_name: fullNameTrimmed,
+        whatsapp: phoneDigits,
         role: "STAFF",
         status: "PENDENTE",
-        cpf: cpfDigits,
-        rg: (rg.trim() || null),
-        birth_date: (birthDate.trim() || null),
-        whatsapp: whatsappDigits,
-        cep: cepDigits,
-        street: (street.trim() || null),
-        number: (number.trim() || null),
-        complement: (complement.trim() || null),
-        neighborhood: (neighborhood.trim() || null),
-        city: (city.trim() || null),
-        state: (stateUf.trim() || null),
-        ...(avatarUrl && { avatar_url: avatarUrl }),
       };
 
       const { error: updateError } = await supabase
@@ -305,7 +193,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 px-4 py-8">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 px-4">
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.03]"
         style={{
@@ -316,7 +204,7 @@ export default function RegisterPage() {
       />
       <div className="pointer-events-none absolute -left-40 -top-40 h-80 w-80 rounded-full bg-cyan-500/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-40 -right-40 h-80 w-80 rounded-full bg-indigo-500/20 blur-3xl" />
-      <div className="relative z-10 w-full max-w-lg">
+      <div className="relative z-10 w-full max-w-md">
         <div className="rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl">
           <div className="mb-4 flex justify-center">
             <Logo />
@@ -324,11 +212,11 @@ export default function RegisterPage() {
           <h1 className="mb-1 flex flex-col items-center text-center text-2xl font-semibold text-white">
             Criar conta
           </h1>
-          <p className="mb-6 text-center text-slate-400">
+          <p className="mb-8 text-center text-slate-400">
             Preencha os dados para solicitar acesso ao sistema
           </p>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
               <div
                 role="alert"
@@ -351,184 +239,48 @@ export default function RegisterPage() {
               </div>
             )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <Input
-                  label="Nome completo"
-                  name="nome_completo"
-                  value={nomeCompleto}
-                  onChange={(e) => setNomeCompleto(e.target.value)}
-                  placeholder="Seu nome completo"
-                  required
-                  disabled={loading}
-                  className={inputClasses}
-                  autoComplete="name"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <Input
-                  label="Apelido"
-                  name="full_name"
-                  value={apelido}
-                  onChange={(e) => setApelido(e.target.value)}
-                  placeholder="Como prefere ser chamado"
-                  disabled={loading}
-                  className={inputClasses}
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <Input
-                  label="Email"
-                  name="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="seu@email.com"
-                  required
-                  disabled={loading}
-                  className={inputClasses}
-                  autoComplete="email"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-300">
-                  CPF
-                </label>
-                <input
-                  name="cpf"
-                  value={cpf}
-                  onChange={(e) => setCpf(formatCpf(e.target.value))}
-                  placeholder="000.000.000-99"
-                  disabled={loading}
-                  className={inputClasses}
-                />
-              </div>
-              <Input
-                label="RG"
-                name="rg"
-                value={rg}
-                onChange={(e) => setRg(e.target.value)}
-                placeholder="Seu RG"
-                disabled={loading}
-                className={inputClasses}
-              />
-              <Input
-                label="Data de Nascimento"
-                name="birth_date"
-                type="date"
-                value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
-                disabled={loading}
-                className={inputClasses}
-              />
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-300">
-                  Whatsapp
-                </label>
-                <input
-                  name="whatsapp"
-                  value={whatsapp}
-                  onChange={(e) => setWhatsapp(formatWhatsapp(e.target.value))}
-                  placeholder="(00) 00000-0000"
-                  disabled={loading}
-                  className={inputClasses}
-                />
-              </div>
-            </div>
-
-            <section>
-              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">
-                Endereço
-              </h2>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-300">
-                    CEP
-                  </label>
-                  <input
-                    name="cep"
-                    value={cep}
-                    onChange={(e) => setCep(formatCep(e.target.value))}
-                    onBlur={handleCepBlur}
-                    placeholder="00000-000"
-                    disabled={loading}
-                    className={inputClasses}
-                  />
-                </div>
-                <Input
-                  label="Rua"
-                  name="street"
-                  value={street}
-                  onChange={(e) => setStreet(e.target.value)}
-                  placeholder="Nome da rua"
-                  disabled={loading}
-                  className={inputClasses}
-                />
-                <Input
-                  label="Número"
-                  name="number"
-                  value={number}
-                  onChange={(e) => setNumber(e.target.value)}
-                  placeholder="Número"
-                  disabled={loading}
-                  className={inputClasses}
-                />
-                <Input
-                  label="Complemento"
-                  name="complement"
-                  value={complement}
-                  onChange={(e) => setComplement(e.target.value)}
-                  placeholder="Apto, bloco, etc."
-                  disabled={loading}
-                  className={inputClasses}
-                />
-                <Input
-                  label="Bairro"
-                  name="neighborhood"
-                  value={neighborhood}
-                  onChange={(e) => setNeighborhood(e.target.value)}
-                  placeholder="Bairro"
-                  disabled={loading}
-                  className={inputClasses}
-                />
-                <Input
-                  label="Cidade"
-                  name="city"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="Cidade"
-                  disabled={loading}
-                  className={inputClasses}
-                />
-                <Input
-                  label="Estado"
-                  name="state"
-                  value={stateUf}
-                  onChange={(e) => setStateUf(e.target.value)}
-                  placeholder="UF"
-                  disabled={loading}
-                  className={inputClasses}
-                />
-              </div>
-            </section>
-
+            <Input
+              label="Apelido"
+              name="full_name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Como prefere ser chamado"
+              required
+              disabled={loading}
+              className={inputClasses}
+              autoComplete="nickname"
+            />
+            <Input
+              label="Email"
+              name="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="seu@email.com"
+              required
+              disabled={loading}
+              className={inputClasses}
+              autoComplete="email"
+            />
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-300">
-                Avatar (opcional)
+              <label
+                htmlFor="phone"
+                className="mb-1.5 block text-sm font-medium text-slate-300"
+              >
+                WhatsApp
               </label>
               <input
-                name="avatar"
-                type="file"
-                accept="image/*"
+                id="phone"
+                name="phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(formatWhatsapp(e.target.value))}
+                placeholder="(00) 00000-0000"
+                required
                 disabled={loading}
                 className={inputClasses}
-                onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
               />
-              <p className="mt-1 text-xs text-slate-500">
-                JPG ou PNG. Máx. recomendado 5MB.
-              </p>
             </div>
-
             <Input
               label="Senha"
               name="password"
@@ -568,7 +320,7 @@ export default function RegisterPage() {
 
             <button
               type="submit"
-              disabled={loading || (!siteKey ? false : !captchaToken)}
+              disabled={loading || (!!siteKey && !captchaToken)}
               className="group relative w-full overflow-hidden rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-3 font-medium text-white shadow-lg shadow-cyan-500/25 transition hover:shadow-cyan-500/40 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-70"
             >
               <span className="relative z-10 flex items-center justify-center gap-2">

@@ -1,7 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerSupabaseClient } from "@/lib/supabaseServer";
+import {
+  createServerSupabaseClient,
+  createServerSupabaseAdminClient,
+} from "@/lib/supabaseServer";
 import { normalizeRole, ROLES, hasPermission } from "@/lib/rbac";
 
 export async function updateUserStatus(
@@ -26,15 +29,24 @@ export async function updateUserStatus(
     return { error: "Sem permissão" };
   }
 
+  const admin = createServerSupabaseAdminClient();
+  const client = admin ?? supabase;
+
   if (status === "APROVADO") {
-    const { error } = await supabase.rpc("approve_user", {
+    const { error: rpcError } = await supabase.rpc("approve_user", {
       p_target_user_id: userId,
     });
-    if (error) return { error: error.message };
+    if (rpcError) {
+      const { error: updateError } = await client
+        .from("profiles")
+        .update({ status: "APROVADO" })
+        .eq("id", userId);
+      if (updateError) return { error: updateError.message };
+    }
   } else {
-    const { error } = await supabase
+    const { error } = await client
       .from("profiles")
-      .update({ status })
+      .update({ status: "REJEITADO" })
       .eq("id", userId);
     if (error) return { error: error.message };
   }

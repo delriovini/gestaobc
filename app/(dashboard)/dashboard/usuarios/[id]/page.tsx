@@ -22,7 +22,6 @@ async function updateUserRole(formData: FormData) {
 
   if (!user) redirect("/login");
 
-  // Verifica se o usuário logado é CEO
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
@@ -32,7 +31,6 @@ async function updateUserRole(formData: FormData) {
   const currentRole = normalizeRole(profile?.role ?? null);
 
   if (currentRole !== ROLES.CEO) {
-    // Apenas CEO pode alterar cargos
     redirect("/dashboard");
   }
 
@@ -49,10 +47,17 @@ async function updateUserRole(formData: FormData) {
     redirect("/dashboard/usuarios");
   }
 
-  await supabase
+  const admin = createServerSupabaseAdminClient();
+  const client = admin ?? supabase;
+
+  const { error } = await client
     .from("profiles")
     .update({ role: newRole })
     .eq("id", userId);
+
+  if (error) {
+    redirect(`/dashboard/usuarios?error=${encodeURIComponent(error.message)}`);
+  }
 
   redirect("/dashboard/usuarios");
 }
