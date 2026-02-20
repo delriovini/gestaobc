@@ -1,8 +1,17 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   async headers() {
+    const authNoStore = [
+      { source: "/login", headers: [{ key: "Cache-Control", value: "no-store" }] },
+      { source: "/register", headers: [{ key: "Cache-Control", value: "no-store" }] },
+      { source: "/forgot-password", headers: [{ key: "Cache-Control", value: "no-store" }] },
+      { source: "/mfa/setup", headers: [{ key: "Cache-Control", value: "no-store" }] },
+      { source: "/verify-mfa", headers: [{ key: "Cache-Control", value: "no-store" }] },
+    ];
     return [
+      ...authNoStore,
       {
         source: "/(.*)",
         headers: [
@@ -39,6 +48,10 @@ const nextConfig: NextConfig = {
       https://player.vimeo.com
       https://*.vimeocdn.com
       https://*.akamaized.net;
+
+    frame-ancestors 'self';
+
+    form-action 'self';
 
     font-src 'self' data: https:;
   `.replace(/\n/g, ""),
