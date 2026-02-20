@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Dropdown options: fundo claro e texto escuro para legibilidade */
+select option {
+  background: white;
+  color: #0f172a;
+}
