@@ -129,9 +129,10 @@ function expandBirthdaysFromProfiles(
     const eventDate = `${year}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     if (eventDate < firstDay || eventDate > lastDay) continue;
     const apelido = (row.full_name && String(row.full_name).trim()) || "";
-    const nomeCompletoOuApelido = (row.nome_completo && String(row.nome_completo).trim()) || apelido || "Usuário";
+    const nomeCompletoOuApelido =
+      (row.nome_completo && String(row.nome_completo).trim()) || apelido || "Usuário";
     const title = `Aniversário - ${apelido || nomeCompletoOuApelido}`;
-    const description = `Aniversário de ${nomeCompletoOuApelido}`;
+    const description = `Aniversário de ${apelido || nomeCompletoOuApelido}`;
     result.push({
       id: `aniversario-${row.id}`,
       title,
@@ -236,11 +237,12 @@ export async function getEventsInRange(startDate: string, endDate: string): Prom
     const eventDate = `${year}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     if (eventDate < startDate || eventDate > endDate) continue;
     const apelido = (row.full_name && String(row.full_name).trim()) || "";
-    const nomeCompletoOuApelido = (row.nome_completo && String(row.nome_completo).trim()) || apelido || "Usuário";
+    const nomeCompletoOuApelido =
+      (row.nome_completo && String(row.nome_completo).trim()) || apelido || "Usuário";
     result.push({
       id: `aniversario-${row.id}`,
       title: `Aniversário - ${apelido || nomeCompletoOuApelido}`,
-      description: `Aniversário de ${nomeCompletoOuApelido}`,
+      description: `Aniversário de ${apelido || nomeCompletoOuApelido}`,
       event_date: eventDate,
       start_time: "00:00:00",
       end_time: null,

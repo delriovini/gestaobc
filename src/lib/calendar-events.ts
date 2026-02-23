@@ -32,9 +32,10 @@ export async function syncBirthdayEvent(
 
   const dataNorm = String(birth_date).trim();
   const apelido = (full_name && String(full_name).trim()) || "";
-  const nomeCompletoOuApelido = (nome_completo && String(nome_completo).trim()) || apelido || "Usuário";
+  const nomeCompletoOuApelido =
+    (nome_completo && String(nome_completo).trim()) || apelido || "Usuário";
   const titulo = `Aniversário - ${apelido || nomeCompletoOuApelido}`;
-  const descricao = `Aniversário de ${nomeCompletoOuApelido}`;
+  const descricao = `Aniversário de ${apelido || nomeCompletoOuApelido}`;
 
   const { error } = await supabase.from("calendar_events").upsert(
     {
