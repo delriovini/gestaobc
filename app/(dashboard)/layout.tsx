@@ -47,7 +47,7 @@ export default async function DashboardLayout({
   const profileSource = admin ?? supabase;
   const { data: profile } = await profileSource
     .from("profiles")
-    .select("id, full_name, role, avatar_url, status, created_at, birth_date")
+    .select("id, full_name, role, avatar_url, status, created_at, birth_date, staff_level")
     .eq("id", user.id)
     .single();
 
@@ -78,6 +78,15 @@ export default async function DashboardLayout({
   const fullName = profile?.full_name?.trim() ?? "";
   const userRole = normalizeRole(profile?.role ?? null) ?? ROLES.STAFF;
   const normalizedRole = userRole.toUpperCase();
+  const staffLevel = profile?.staff_level ?? null;
+  const staffLevelLabel =
+    typeof staffLevel === "string" && staffLevel.trim().length > 0
+      ? staffLevel[0] + staffLevel.slice(1).toLowerCase()
+      : null;
+  const displayRole =
+    normalizedRole === "STAFF" && staffLevelLabel
+      ? `STAFF - ${staffLevelLabel}`
+      : normalizedRole;
 
   let count = 0;
   if (normalizedRole === "CEO" || normalizedRole === "GESTOR") {
@@ -165,7 +174,7 @@ export default async function DashboardLayout({
               <span
                 className={`mt-0.5 inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium ${roleBadgeClasses(normalizedRole)}`}
               >
-                {normalizedRole}
+                {displayRole}
               </span>
             </div>
           </a>

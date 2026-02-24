@@ -27,6 +27,7 @@ export interface Database {
           city: string | null;
           state: string | null;
           role: string | null;
+          staff_level: Database["public"]["Enums"]["staff_level"] | null;
           status: string | null;
           avatar_url: string | null;
           mfa_enabled: boolean | null;
@@ -50,6 +51,7 @@ export interface Database {
           city?: string | null;
           state?: string | null;
           role?: string | null;
+          staff_level?: Database["public"]["Enums"]["staff_level"] | null;
           status?: string | null;
           avatar_url?: string | null;
           mfa_enabled?: boolean | null;
@@ -73,6 +75,7 @@ export interface Database {
           city?: string | null;
           state?: string | null;
           role?: string | null;
+          staff_level?: Database["public"]["Enums"]["staff_level"] | null;
           status?: string | null;
           avatar_url?: string | null;
           mfa_enabled?: boolean | null;
@@ -118,6 +121,9 @@ export interface Database {
           updated_at?: string;
         };
       };
+    };
+    Enums: {
+      staff_level: "TRAINEE" | "SUPORTE" | "MODERADOR" | "ADMINISTRADOR";
     };
   };
 }
