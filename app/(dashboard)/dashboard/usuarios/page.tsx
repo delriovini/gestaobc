@@ -29,6 +29,7 @@ export default async function UsuariosPage() {
     email: string | null;
     role: string | null;
     status: string | null;
+    staff_level: string | null;
   }> = [];
 
   if (isCEOOrGestor) {
@@ -66,15 +67,29 @@ export default async function UsuariosPage() {
     );
   }
 
-  const rows = users.map((u) => ({
-    id: u.id,
-    name:
-      (u.full_name ?? null) ??
-      (u.email ? String(u.email).split("@")[0] : "Sem nome"),
-    role: u.role ?? "STAFF",
-    email: u.email ?? "",
-    status: u.status ?? null,
-  }));
+  function formatStaffLevel(s: string | null | undefined): string | null {
+    if (s == null || !s.trim()) return null;
+    const t = s.trim();
+    return t[0] + t.slice(1).toLowerCase();
+  }
+
+  const rows = users.map((u) => {
+    const role = u.role ?? "STAFF";
+    const staffLevel = u.staff_level ?? null;
+    const displayRole =
+      role === "STAFF" && staffLevel
+        ? `STAFF - ${formatStaffLevel(staffLevel) ?? staffLevel}`
+        : role;
+    return {
+      id: u.id,
+      name:
+        (u.full_name ?? null) ??
+        (u.email ? String(u.email).split("@")[0] : "Sem nome"),
+      role: displayRole,
+      email: u.email ?? "",
+      status: u.status ?? null,
+    };
+  });
 
   return (
     <div className="space-y-6">
