@@ -32,8 +32,30 @@ export default function MfaSetupPage() {
     async function enroll() {
       try {
         const supabase = createClient();
+
+        const { data: factorsData } = await supabase.auth.mfa.listFactors();
+        if (cancelled) return;
+
+        const hasVerified = factorsData?.totp?.some(
+          (f: { status: string }) => f.status === "verified"
+        );
+        if (hasVerified) {
+          router.replace("/dashboard");
+          setLoading(false);
+          return;
+        }
+
+        const unverifiedTotp = factorsData?.totp?.filter(
+          (f: { id: string; status: string }) => f.status === "unverified"
+        ) ?? [];
+        for (const factor of unverifiedTotp) {
+          await supabase.auth.mfa.unenroll({ factorId: factor.id });
+          if (cancelled) return;
+        }
+
         const { data, error } = await supabase.auth.mfa.enroll({
           factorType: "totp",
+          friendlyName: "Authenticator",
         });
 
         if (cancelled) return;
@@ -65,7 +87,7 @@ export default function MfaSetupPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [router]);
 
   async function handleConfirm(e: React.FormEvent) {
     e.preventDefault();

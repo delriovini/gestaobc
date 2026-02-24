@@ -33,8 +33,29 @@ export function SecuritySection({ mfaEnabled, onMfaChange }: SecuritySectionProp
 
     try {
       const supabase = createClient();
+
+      const { data: factorsData } = await supabase.auth.mfa.listFactors();
+      const hasVerified = factorsData?.totp?.some(
+        (f: { status: string }) => f.status === "verified"
+      );
+      if (hasVerified) {
+        onMfaChange(true);
+        router.replace("/dashboard");
+        setLoading(false);
+        setAction(null);
+        return;
+      }
+
+      const unverifiedTotp = factorsData?.totp?.filter(
+        (f: { id: string; status: string }) => f.status === "unverified"
+      ) ?? [];
+      for (const factor of unverifiedTotp) {
+        await supabase.auth.mfa.unenroll({ factorId: factor.id });
+      }
+
       const { data, error: enrollError } = await supabase.auth.mfa.enroll({
         factorType: "totp",
+        friendlyName: "Authenticator",
       });
 
       if (enrollError) {
