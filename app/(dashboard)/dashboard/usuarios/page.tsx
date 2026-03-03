@@ -9,10 +9,10 @@ type RoleFilter = "TODOS" | "CEO" | "GESTOR" | "STAFF";
 type StaffLevelFilter = "TRAINEE" | "SUPORTE" | "MODERADOR" | "ADMINISTRADOR";
 
 interface UsuariosPageProps {
-  searchParams?: {
+  searchParams?: Promise<{
     role?: string;
     staff_level?: string;
-  };
+  }>;
 }
 
 export default async function UsuariosPage({ searchParams }: UsuariosPageProps) {
@@ -33,10 +33,17 @@ export default async function UsuariosPage({ searchParams }: UsuariosPageProps) 
   const isCEOOrGestor =
     userRole === ROLES.CEO || userRole === ROLES.GESTOR;
 
-  const rawRoleFilter = typeof searchParams?.role === "string" ? searchParams.role : "TODOS";
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+
+  const rawRoleFilter =
+    typeof resolvedSearchParams?.role === "string"
+      ? resolvedSearchParams.role
+      : "TODOS";
   const roleFilter = rawRoleFilter ? (rawRoleFilter.toUpperCase() as RoleFilter) : "TODOS";
   const rawStaffFilter =
-    typeof searchParams?.staff_level === "string" ? searchParams.staff_level : undefined;
+    typeof resolvedSearchParams?.staff_level === "string"
+      ? resolvedSearchParams.staff_level
+      : undefined;
   const staffFilter = rawStaffFilter
     ? (rawStaffFilter.toUpperCase() as StaffLevelFilter)
     : undefined;
