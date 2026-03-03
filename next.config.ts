@@ -24,7 +24,8 @@ const nextConfig: NextConfig = {
       https://hcaptcha.com
       https://*.hcaptcha.com
       https://player.vimeo.com
-      https://*.vimeocdn.com;
+      https://*.vimeocdn.com
+      https://static.cloudflareinsights.com;
 
     style-src 'self' 'unsafe-inline' https://*.vimeocdn.com;
 
