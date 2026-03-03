@@ -130,6 +130,7 @@ export async function createPointsLog(formData: FormData) {
   const rule_id = (formData.get("rule_id") as string)?.trim();
   const description = (formData.get("description") as string)?.trim() || null;
   const quantity = Math.max(1, Number(formData.get("quantity")) || 1);
+  const rawReferenceMonth = (formData.get("reference_month") as string | null) ?? "";
 
   if (!user_id || !rule_id) {
     throw new Error("Usuário e regra são obrigatórios.");
@@ -153,11 +154,36 @@ export async function createPointsLog(formData: FormData) {
 
   const totalPoints = rule.points * quantity;
 
+  let reference_month: string;
+  if (/^\d{4}-\d{2}$/.test(rawReferenceMonth)) {
+    reference_month = `${rawReferenceMonth}-01`;
+  } else {
+    const now = new Date();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    reference_month = `${now.getFullYear()}-${m}-01`;
+  }
+
+  // Verifica se o mês está fechado antes de lançar pontos
+  const { data: monthControl, error: monthError } = await supabase
+    .from("gamification_months")
+    .select("status")
+    .eq("reference_month", reference_month)
+    .maybeSingle();
+
+  if (monthError) {
+    throw new Error(`Erro ao verificar status do mês: ${monthError.message}`);
+  }
+
+  if (monthControl && monthControl.status === "CLOSED") {
+    throw new Error("Este mês já está fechado para lançamentos.");
+  }
+
   const { error: insertError } = await supabase.from("gamification_points").insert({
     user_id,
     rule_id: rule.id,
     points: totalPoints,
     description,
+    reference_month,
   });
 
   if (insertError) {

@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
-import { createServerSupabaseClient } from "@/lib/supabaseServer";
+import {
+  createServerSupabaseClient,
+  createServerSupabaseAdminClient,
+} from "@/lib/supabaseServer";
 
 type MissionRow = {
   id: string;
@@ -20,12 +23,56 @@ function getCurrentMonthYear() {
   return { month: now.getMonth() + 1, year: now.getFullYear() };
 }
 
+function parseSelectedMonth(
+  raw: string | undefined,
+  fallbackMonth: number,
+  fallbackYear: number,
+) {
+  if (!raw) {
+    return { month: fallbackMonth, year: fallbackYear };
+  }
+
+  const parts = raw.split("-");
+  if (parts.length !== 2) {
+    return { month: fallbackMonth, year: fallbackYear };
+  }
+
+  const year = Number(parts[0]);
+  const month = Number(parts[1]);
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    month < 1 ||
+    month > 12
+  ) {
+    return { month: fallbackMonth, year: fallbackYear };
+  }
+
+  return { month, year };
+}
+
 const MONTH_NAMES = [
-  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
 ];
 
-export default async function GamificacaoPage() {
+interface GamificacaoPageProps {
+  searchParams?: {
+    mes?: string;
+  };
+}
+
+export default async function GamificacaoPage({ searchParams }: GamificacaoPageProps) {
   const supabase = await createServerSupabaseClient();
 
   const {
@@ -36,40 +83,104 @@ export default async function GamificacaoPage() {
     redirect("/login");
   }
 
-  const { month, year } = getCurrentMonthYear();
+  const { month: currentMonth, year: currentYear } = getCurrentMonthYear();
+  const { month, year } = parseSelectedMonth(
+    searchParams?.mes,
+    currentMonth,
+    currentYear,
+  );
   const monthName = MONTH_NAMES[month - 1];
+  const selectedMonthValue = `${year}-${String(month).padStart(2, "0")}`;
+  const referenceMonth = `${selectedMonthValue}-01`;
 
-  const { data: ranking } = await supabase.rpc("get_gamification_ranking");
+  // Status de fechamento do mês selecionado
+  const { data: monthControl } = await supabase
+    .from("gamification_months")
+    .select("status")
+    .eq("reference_month", referenceMonth)
+    .maybeSingle();
 
-  type RankingRow = {
+  const isMonthClosed = monthControl?.status === "CLOSED";
+
+  // 1) Ranking: somar pontos por usuário no mês de referência
+  type PointsRow = {
     user_id: string;
-    total_points?: number | string | null;
-    full_name?: string | null;
-    avatar_url?: string | null;
+    points: number;
+    reference_month: string | null;
   };
-  const normalizeTotal = (r: RankingRow) => {
-    const t = r.total_points;
-    if (t === null || t === undefined) return 0;
-    const n = Number(t);
-    return Number.isFinite(n) ? n : 0;
+
+  const { data: points } = await supabase
+    .from("gamification_points")
+    .select("user_id, points, reference_month")
+    .eq("reference_month", referenceMonth);
+
+  const totals = new Map<string, number>();
+  for (const row of (points ?? []) as PointsRow[]) {
+    const current = totals.get(row.user_id) ?? 0;
+    totals.set(row.user_id, current + (row.points ?? 0));
+  }
+
+  const userIds = Array.from(totals.keys());
+
+  type ProfileRow = {
+    id: string;
+    full_name: string | null;
+    avatar_url: string | null;
   };
-  const rankingList = (ranking ?? []).map((r: RankingRow) => ({
-    user_id: r.user_id,
-    total: normalizeTotal(r),
-    full_name: r.full_name?.trim() || "Usuário",
-    avatar_url: r.avatar_url ?? null,
-  }));
+
+  const admin = createServerSupabaseAdminClient();
+  const profilesClient = admin ?? supabase;
+
+  let profilesById = new Map<string, ProfileRow>();
+  if (userIds.length > 0) {
+    const { data: profiles } = await profilesClient
+      .from("profiles")
+      .select("id, full_name, avatar_url")
+      .in("id", userIds);
+    profilesById = new Map(
+      ((profiles ?? []) as ProfileRow[]).map((p) => [p.id, p]),
+    );
+  }
+
+  type RankingItem = {
+    user_id: string;
+    total: number;
+    full_name: string;
+    avatar_url: string | null;
+  };
+
+  const rankingList: RankingItem[] = Array.from(totals.entries())
+    .map(([user_id, total]) => {
+      const profile = profilesById.get(user_id);
+      const fullName =
+        profile?.full_name?.trim() ||
+        user_id.slice(0, 8);
+      return {
+        user_id,
+        total,
+        full_name: fullName,
+        avatar_url: profile?.avatar_url ?? null,
+      };
+    })
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5);
 
   const signedAvatars: Record<string, string | null> = {};
   for (const r of rankingList) {
-    if (r.avatar_url) {
-      const { data } = await supabase.storage
-        .from("avatars")
-        .createSignedUrl(r.avatar_url, 3600);
-      signedAvatars[r.user_id] = data?.signedUrl ?? null;
-    } else {
+    const path = r.avatar_url;
+    if (!path) {
       signedAvatars[r.user_id] = null;
+      continue;
     }
+    const trimmed = path.trim();
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      signedAvatars[r.user_id] = trimmed;
+      continue;
+    }
+    const { data } = await supabase.storage
+      .from("avatars")
+      .createSignedUrl(trimmed, 3600);
+    signedAvatars[r.user_id] = data?.signedUrl ?? null;
   }
 
   // 2) Regras ativas (para o usuário conhecer as regras e pontuações)
@@ -81,32 +192,61 @@ export default async function GamificacaoPage() {
 
   const typedRules = (rules ?? []) as RuleRow[];
 
-  // 3) Missão ativa do mês atual
-  const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
-
+  // 3) Missão ativa do mês selecionado
   const { data: mission } = await supabase
     .from("gamification_missions")
     .select("*")
     .eq("is_active", true)
-    .eq("month", currentMonth)
-    .eq("year", currentYear)
+    .eq("month", month)
+    .eq("year", year)
     .maybeSingle();
 
   const { data: history } = await supabase
     .from("gamification_points")
     .select("*")
     .eq("user_id", user.id)
+    .eq("reference_month", referenceMonth)
     .order("created_at", { ascending: false });
 
   return (
     <div className="space-y-8">
       <div className="rounded-xl border border-white/10 bg-slate-900/50 p-6 shadow-lg backdrop-blur-sm">
-        <h1 className="text-2xl font-semibold text-white">Gamificação</h1>
-        <p className="mt-1 text-slate-400">
-          Ranking e missão de {monthName} de {year}.
-        </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-white">Gamificação</h1>
+            <p className="mt-1 text-slate-400">
+              Ranking e missão de {monthName} de {year}.
+            </p>
+            {isMonthClosed && (
+              <span className="mt-2 inline-flex items-center rounded-full bg-red-500/20 px-3 py-1 text-xs font-semibold text-red-300">
+                Mês FECHADO
+              </span>
+            )}
+          </div>
+          <div className="flex flex-col items-end gap-2 text-sm sm:flex-row sm:items-center sm:gap-3">
+            <form method="GET" className="flex items-center gap-2">
+              <label
+                htmlFor="mes"
+                className="text-slate-300"
+              >
+                Mês:
+              </label>
+              <input
+                id="mes"
+                name="mes"
+                type="month"
+                defaultValue={selectedMonthValue}
+                className="rounded-lg border border-white/10 bg-slate-900 px-3 py-1.5 text-xs text-slate-100 outline-none focus:border-cyan-500/60 [color-scheme:dark]"
+              />
+              <button
+                type="submit"
+                className="rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-cyan-500"
+              >
+                Filtrar
+              </button>
+            </form>
+          </div>
+        </div>
       </div>
 
       {/* Ranking do mês - Top 5 */}

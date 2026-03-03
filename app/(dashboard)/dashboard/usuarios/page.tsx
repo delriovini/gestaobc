@@ -5,7 +5,17 @@ import { normalizeRole, ROLES, hasPermission } from "@/lib/rbac";
 import { ApproveRejectButtons } from "./ApproveRejectButtons";
 import { toggleUserStatusForm } from "./actions";
 
-export default async function UsuariosPage() {
+type RoleFilter = "TODOS" | "CEO" | "GESTOR" | "STAFF";
+type StaffLevelFilter = "TRAINEE" | "SUPORTE" | "MODERADOR" | "ADMINISTRADOR";
+
+interface UsuariosPageProps {
+  searchParams?: {
+    role?: string;
+    staff_level?: string;
+  };
+}
+
+export default async function UsuariosPage({ searchParams }: UsuariosPageProps) {
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
@@ -23,6 +33,14 @@ export default async function UsuariosPage() {
   const isCEOOrGestor =
     userRole === ROLES.CEO || userRole === ROLES.GESTOR;
 
+  const rawRoleFilter = typeof searchParams?.role === "string" ? searchParams.role : "TODOS";
+  const roleFilter = rawRoleFilter ? (rawRoleFilter.toUpperCase() as RoleFilter) : "TODOS";
+  const rawStaffFilter =
+    typeof searchParams?.staff_level === "string" ? searchParams.staff_level : undefined;
+  const staffFilter = rawStaffFilter
+    ? (rawStaffFilter.toUpperCase() as StaffLevelFilter)
+    : undefined;
+
   let users: Array<{
     id: string;
     full_name: string | null;
@@ -33,10 +51,20 @@ export default async function UsuariosPage() {
   }> = [];
 
   if (isCEOOrGestor) {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .order("full_name", { ascending: true });
+    let query = supabase.from("profiles").select("*");
+
+    if (roleFilter !== "TODOS") {
+      if (roleFilter === "STAFF") {
+        query = query.eq("role", "STAFF");
+        if (staffFilter) {
+          query = query.eq("staff_level", staffFilter);
+        }
+      } else if (roleFilter === "CEO" || roleFilter === "GESTOR") {
+        query = query.eq("role", roleFilter);
+      }
+    }
+
+    const { data, error } = await query.order("full_name", { ascending: true });
     if (error) throw new Error(error.message);
     users = (data ?? []) as typeof users;
   } else {
@@ -93,8 +121,56 @@ export default async function UsuariosPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-semibold text-white">Usuários</h1>
+        <form
+          method="GET"
+          className="flex flex-wrap items-center gap-3 text-sm"
+        >
+          <div className="flex items-center gap-2">
+            <label htmlFor="role" className="text-slate-300">
+              Cargo:
+            </label>
+            <select
+              id="role"
+              name="role"
+              defaultValue={roleFilter}
+              className="rounded-lg border border-white/10 bg-slate-900 px-2 py-1.5 text-xs text-slate-100"
+            >
+              <option value="TODOS">Todos</option>
+              <option value="CEO">CEO</option>
+              <option value="GESTOR">GESTOR</option>
+              <option value="STAFF">STAFF</option>
+            </select>
+          </div>
+
+          {roleFilter === "STAFF" && (
+            <div className="flex items-center gap-2">
+              <label htmlFor="staff_level" className="text-slate-300">
+                Nível:
+              </label>
+              <select
+                id="staff_level"
+                name="staff_level"
+                defaultValue={staffFilter ?? ""}
+                className="rounded-lg border border-white/10 bg-slate-900 px-2 py-1.5 text-xs text-slate-100"
+              >
+                <option value="">Todos</option>
+                <option value="TRAINEE">TRAINEE</option>
+                <option value="SUPORTE">SUPORTE</option>
+                <option value="MODERADOR">MODERADOR</option>
+                <option value="ADMINISTRADOR">ADMINISTRADOR</option>
+              </select>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-cyan-600"
+          >
+            Filtrar
+          </button>
+        </form>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-white/10 bg-slate-900/60">

@@ -60,6 +60,13 @@ const iconByPath: Record<string, React.ReactNode> = {
       d="M15 17.25a3.75 3.75 0 10-6 0m9 3a4.5 4.5 0 00-9 0m4.5-15a3 3 0 110 6 3 3 0 010-6zm-7.5 3a3 3 0 100 6 3 3 0 000-6z"
     />
   ),
+  "/dashboard/equipe": (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M18 18.75a3.75 3.75 0 10-3.75-3.75M18 18.75a3.75 3.75 0 01-3.75-3.75M18 18.75V21M6 18.75a3.75 3.75 0 10-3.75-3.75M6 18.75a3.75 3.75 0 003.75-3.75M6 18.75V21M12 11.25a3.75 3.75 0 100-7.5M12 11.25a3.75 3.75 0 003.75-3.75M12 11.25V21"
+    />
+  ),
   "/dashboard/relatorios": (
     <path
       strokeLinecap="round"

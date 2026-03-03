@@ -9,6 +9,7 @@ export interface NavRoute {
 
 export const navRoutes: NavRoute[] = [
   { name: "Dashboard", path: "/dashboard", minimumRole: ROLES.STAFF },
+  { name: "Equipe", path: "/dashboard/equipe", minimumRole: ROLES.STAFF },
   { name: "Kanban", path: "/dashboard/kanban", minimumRole: ROLES.STAFF },
   { name: "Calendário", path: "/dashboard/calendario", minimumRole: ROLES.STAFF },
   { name: "Treinamentos", path: "/dashboard/treinamentos", minimumRole: ROLES.STAFF },

@@ -10,6 +10,7 @@ import {
   toggleMission,
   deleteMission,
 } from "./actions";
+import { closeGamificationMonth } from "../../gamificacao/actions";
 import { DeletePointsLogButton } from "./DeletePointsLogButton";
 
 const MONTH_NAMES = [
@@ -22,6 +23,20 @@ export async function GamificacaoAdminContent() {
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
+  const defaultMonthValue = `${currentYear}-${String(currentMonth).padStart(2, "0")}`;
+
+  const referenceMonthForCurrent = `${currentYear}-${String(currentMonth).padStart(
+    2,
+    "0",
+  )}-01`;
+
+  const { data: currentMonthControl } = await supabase
+    .from("gamification_months")
+    .select("status")
+    .eq("reference_month", referenceMonthForCurrent)
+    .maybeSingle();
+
+  const isCurrentMonthClosed = currentMonthControl?.status === "CLOSED";
 
   const { data: rules } = await supabase
     .from("gamification_rules")
@@ -166,9 +181,15 @@ export async function GamificacaoAdminContent() {
         {/* COLUNA 2 - LANÇAR PONTOS */}
         <div className="rounded-xl border border-white/10 bg-slate-900/50 p-6 shadow-lg backdrop-blur-sm">
           <h3 className="text-lg font-semibold text-white">Lançar pontos</h3>
-          <p className="mt-1 mb-4 text-sm text-slate-400">
+          <p className="mt-1 mb-2 text-sm text-slate-400">
             Selecione usuário e regra. Os pontos são definidos pela regra (não editáveis).
           </p>
+          {isCurrentMonthClosed && (
+            <p className="mb-3 text-xs font-semibold text-red-400">
+              O mês atual está fechado para lançamentos. Novos pontos só podem ser lançados
+              para meses ainda em aberto.
+            </p>
+          )}
 
           <form action={createPointsLog} className="space-y-3">
             <div>
@@ -177,6 +198,7 @@ export async function GamificacaoAdminContent() {
                 name="user_id"
                 required
                 className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500/60"
+                disabled={isCurrentMonthClosed}
               >
                 <option value="">Selecione</option>
                 {(profiles ?? []).map((p) => (
@@ -192,6 +214,7 @@ export async function GamificacaoAdminContent() {
                 name="rule_id"
                 required
                 className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500/60"
+                disabled={isCurrentMonthClosed}
               >
                 <option value="">Selecione</option>
                 {(rules ?? []).filter((r) => r.is_active).map((r) => (
@@ -202,6 +225,22 @@ export async function GamificacaoAdminContent() {
               </select>
             </div>
             <div>
+              <label className="mb-1 block text-xs font-medium text-slate-400">
+                Mês de referência
+              </label>
+              <input
+                name="reference_month"
+                type="month"
+                required
+                defaultValue={defaultMonthValue}
+                className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500/60 [color-scheme:dark]"
+                disabled={isCurrentMonthClosed}
+              />
+              <p className="mt-0.5 text-xs text-slate-500">
+                Mês ao qual estes pontos pertencem (usado para filtros e ranking mensal).
+              </p>
+            </div>
+            <div>
               <label className="mb-1 block text-xs font-medium text-slate-400">Quantidade</label>
               <input
                 name="quantity"
@@ -210,6 +249,7 @@ export async function GamificacaoAdminContent() {
                 defaultValue={1}
                 placeholder="1"
                 className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:border-cyan-500/60"
+                disabled={isCurrentMonthClosed}
               />
               <p className="mt-0.5 text-xs text-slate-500">Vezes que a regra será aplicada (ex.: 10 = soma 10× os pontos da regra em um único lançamento).</p>
             </div>
@@ -219,14 +259,43 @@ export async function GamificacaoAdminContent() {
                 name="description"
                 placeholder="Observação do lançamento"
                 className="w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:border-cyan-500/60"
+                disabled={isCurrentMonthClosed}
               />
             </div>
             <button
               type="submit"
-              className="w-full rounded-lg bg-cyan-600 px-3 py-2 text-sm font-medium text-white hover:bg-cyan-500"
+              className="w-full rounded-lg bg-cyan-600 px-3 py-2 text-sm font-medium text-white hover:bg-cyan-500 disabled:opacity-60 disabled:cursor-not-allowed"
+              disabled={isCurrentMonthClosed}
             >
               Adicionar
             </button>
+          </form>
+
+          {/* Fechamento de mês */}
+          <form action={closeGamificationMonth} className="mt-4 space-y-2">
+            <p className="text-xs font-semibold text-slate-300">
+              Fechamento de mês
+            </p>
+            <p className="text-[11px] text-slate-500">
+              Ao fechar um mês, novos lançamentos para aquele mês serão bloqueados. Esta ação
+              não reabre meses já fechados.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                name="reference_month"
+                type="month"
+                defaultValue={defaultMonthValue}
+                className="rounded-lg border border-white/10 bg-slate-900 px-3 py-1.5 text-xs text-white outline-none focus:border-red-500/60 [color-scheme:dark]"
+                required
+              />
+              <input type="hidden" name="mes" value={defaultMonthValue} />
+              <button
+                type="submit"
+                className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-500"
+              >
+                Fechar mês selecionado
+              </button>
+            </div>
           </form>
 
           <h4 className="mt-6 text-sm font-semibold text-white">Histórico de lançamentos</h4>
