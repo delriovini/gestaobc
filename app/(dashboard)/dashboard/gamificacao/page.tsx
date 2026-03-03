@@ -67,9 +67,9 @@ const MONTH_NAMES = [
 ];
 
 interface GamificacaoPageProps {
-  searchParams?: {
+  searchParams?: Promise<{
     mes?: string;
-  };
+  }>;
 }
 
 export default async function GamificacaoPage({ searchParams }: GamificacaoPageProps) {
@@ -83,9 +83,11 @@ export default async function GamificacaoPage({ searchParams }: GamificacaoPageP
     redirect("/login");
   }
 
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+
   const { month: currentMonth, year: currentYear } = getCurrentMonthYear();
   const { month, year } = parseSelectedMonth(
-    searchParams?.mes,
+    resolvedSearchParams?.mes,
     currentMonth,
     currentYear,
   );
