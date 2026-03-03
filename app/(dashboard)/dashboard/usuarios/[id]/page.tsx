@@ -34,44 +34,65 @@ async function updateUserRole(formData: FormData) {
 
   const currentRole = normalizeRole(profile?.role ?? null);
 
-  if (currentRole !== ROLES.CEO) {
+  if (currentRole !== ROLES.CEO && currentRole !== ROLES.GESTOR) {
     redirect("/dashboard");
   }
 
   const userId = formData.get("id") as string | null;
-  const newRoleRaw = formData.get("role") as string | null;
-  const newStaffLevelRaw = formData.get("staff_level") as string | null;
-
-  if (!userId || !newRoleRaw) {
-    redirect("/dashboard/usuarios");
-  }
-
-  const newRole = normalizeRole(newRoleRaw);
-
-  if (!newRole) {
-    redirect("/dashboard/usuarios");
-  }
-
-  let newStaffLevel: Database["public"]["Enums"]["staff_level"] | null = null;
-  if (newRole === ROLES.STAFF && newStaffLevelRaw) {
-    const trimmed = newStaffLevelRaw.trim().toUpperCase();
-    const validValues: Database["public"]["Enums"]["staff_level"][] = [
-      "TRAINEE",
-      "SUPORTE",
-      "MODERADOR",
-      "ADMINISTRADOR",
-    ];
-    if (validValues.includes(trimmed as Database["public"]["Enums"]["staff_level"])) {
-      newStaffLevel = trimmed as Database["public"]["Enums"]["staff_level"];
-    }
-  }
+  if (!userId) redirect("/dashboard/usuarios");
 
   const admin = createServerSupabaseAdminClient();
   const client = admin ?? supabase;
 
+  const { data: targetProfile } = await client
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!targetProfile) redirect("/dashboard/usuarios");
+
+  let newRole: string;
+  let newStaffLevel: Database["public"]["Enums"]["staff_level"] | null = null;
+
+  const newStaffLevelRaw = formData.get("staff_level") as string | null;
+  const validStaffLevels: Database["public"]["Enums"]["staff_level"][] = [
+    "TRAINEE",
+    "SUPORTE",
+    "MODERADOR",
+    "ADMINISTRADOR",
+  ];
+
+  if (currentRole === ROLES.CEO) {
+    const newRoleRaw = formData.get("role") as string | null;
+    if (!newRoleRaw) redirect("/dashboard/usuarios");
+    const normalized = normalizeRole(newRoleRaw);
+    if (!normalized) redirect("/dashboard/usuarios");
+    newRole = normalized;
+    if (newRole === ROLES.STAFF && newStaffLevelRaw?.trim()) {
+      const trimmed = newStaffLevelRaw.trim().toUpperCase();
+      if (validStaffLevels.includes(trimmed as Database["public"]["Enums"]["staff_level"])) {
+        newStaffLevel = trimmed as Database["public"]["Enums"]["staff_level"];
+      }
+    }
+  } else {
+    newRole = normalizeRole(targetProfile.role ?? null) ?? ROLES.STAFF;
+    if (newStaffLevelRaw?.trim()) {
+      const trimmed = newStaffLevelRaw.trim().toUpperCase();
+      if (validStaffLevels.includes(trimmed as Database["public"]["Enums"]["staff_level"])) {
+        newStaffLevel = trimmed as Database["public"]["Enums"]["staff_level"];
+      }
+    }
+  }
+
+  const updatePayload =
+    newRole === ROLES.STAFF
+      ? { role: newRole, staff_level: newStaffLevel }
+      : { role: newRole, staff_level: null };
+
   const { error } = await client
     .from("profiles")
-    .update({ role: newRole, staff_level: newRole === ROLES.STAFF ? newStaffLevel : null })
+    .update(updatePayload)
     .eq("id", userId);
 
   if (error) {
@@ -156,6 +177,9 @@ export default async function EditUsuarioPage({ params }: PageProps) {
   const targetRole = targetUser.role ?? "STAFF";
   const targetStaffLevel = targetUser.staff_level ?? null;
   const canEditRole = currentRole === ROLES.CEO;
+  const canEditStaffLevel =
+    (currentRole === ROLES.CEO || currentRole === ROLES.GESTOR) &&
+    targetRole === ROLES.STAFF;
 
   return (
     <div className="space-y-6">
@@ -219,29 +243,6 @@ export default async function EditUsuarioPage({ params }: PageProps) {
                   <option value={ROLES.STAFF}>STAFF</option>
                 </select>
               </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-300">
-                  Nível de staff
-                </label>
-                <select
-                  name="staff_level"
-                  defaultValue={
-                    targetRole === ROLES.STAFF && targetStaffLevel ? targetStaffLevel : ""
-                  }
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-200 outline-none"
-                >
-                  <option value="">Selecione (apenas para STAFF)</option>
-                  <option value="TRAINEE">TRAINEE</option>
-                  <option value="SUPORTE">SUPORTE</option>
-                  <option value="MODERADOR">MODERADOR</option>
-                  <option value="ADMINISTRADOR">ADMINISTRADOR</option>
-                </select>
-                <p className="mt-1 text-xs text-slate-500">
-                  Este campo só é considerado quando o cargo é STAFF. Para CEO ou GESTOR, o nível é ignorado.
-                </p>
-              </div>
-
               <div className="mt-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
                 <p className="font-semibold flex items-center gap-1">
                   <span>⚠</span>
@@ -256,6 +257,7 @@ export default async function EditUsuarioPage({ params }: PageProps) {
 
           {!canEditRole && (
             <div>
+              <input type="hidden" name="role" value={targetRole} />
               <label className="mb-1.5 block text-sm font-medium text-slate-300">
                 Cargo
               </label>
@@ -271,6 +273,30 @@ export default async function EditUsuarioPage({ params }: PageProps) {
             </div>
           )}
 
+          {canEditStaffLevel && (
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-300">
+                Nível de staff
+              </label>
+              <select
+                name="staff_level"
+                defaultValue={
+                  targetRole === ROLES.STAFF && targetStaffLevel ? targetStaffLevel : ""
+                }
+                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-200 outline-none"
+              >
+                <option value="">Selecione (apenas para STAFF)</option>
+                <option value="TRAINEE">TRAINEE</option>
+                <option value="SUPORTE">SUPORTE</option>
+                <option value="MODERADOR">MODERADOR</option>
+                <option value="ADMINISTRADOR">ADMINISTRADOR</option>
+              </select>
+              <p className="mt-1 text-xs text-slate-500">
+                Este campo só é considerado quando o cargo é STAFF. CEO e GESTOR podem alterar o nível de staff.
+              </p>
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 pt-2">
             <a
               href="/dashboard/usuarios"
@@ -278,7 +304,7 @@ export default async function EditUsuarioPage({ params }: PageProps) {
             >
               Cancelar
             </a>
-            {canEditRole && (
+            {(canEditRole || canEditStaffLevel) && (
               <button
                 type="submit"
                 className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-cyan-600"
