@@ -18,7 +18,7 @@ const MONTH_NAMES = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
 
-export async function GamificacaoAdminContent() {
+export async function GamificacaoAdminContent({ usuarioFiltro }: { usuarioFiltro?: string }) {
   const supabase = await createClient();
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
@@ -70,6 +70,16 @@ export async function GamificacaoAdminContent() {
 
   const profileByUserId = new Map((profiles ?? []).map((p) => [p.id, p.full_name?.trim() || p.id.slice(0, 8)]));
   const ruleNameById = new Map((rules ?? []).map((r) => [r.id, r.name]));
+
+  const searchValue = usuarioFiltro?.trim().toLowerCase() || "";
+  const allLogsArray = allLogs ?? [];
+  const filteredLogs =
+    searchValue.length === 0
+      ? allLogsArray
+      : allLogsArray.filter((log) => {
+          const name = (profileByUserId.get(log.user_id) ?? "").toLowerCase();
+          return name.includes(searchValue);
+        });
 
   return (
     <div className="space-y-6">
@@ -298,15 +308,42 @@ export async function GamificacaoAdminContent() {
             </div>
           </form>
 
-          <h4 className="mt-6 text-sm font-semibold text-white">Histórico de lançamentos</h4>
+          <h4 id="gamification-history" className="mt-6 text-sm font-semibold text-white">Histórico de lançamentos</h4>
           <p className="mt-0.5 text-xs text-slate-400">
             Últimos lançamentos manuais (mais recentes primeiro).
           </p>
-          {(!allLogs || allLogs.length === 0) ? (
-            <p className="mt-3 text-sm text-slate-500">Nenhum lançamento ainda.</p>
+          <form method="GET" action="#gamification-history" className="mt-3 flex flex-wrap items-center gap-2">
+            <input type="hidden" name="tab" value="gamificacao" />
+            <input
+              name="usuario"
+              placeholder="Pesquisar por usuário"
+              defaultValue={usuarioFiltro ?? ""}
+              className="min-w-0 flex-1 rounded-lg border border-white/10 bg-slate-900 px-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none focus:border-cyan-500/60"
+            />
+            <button
+              type="submit"
+              className="rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-medium text-slate-100 hover:bg-slate-600"
+            >
+              Buscar
+            </button>
+            {usuarioFiltro ? (
+              <a
+                href="/dashboard/config?tab=gamificacao#gamification-history"
+                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800/60"
+              >
+                Limpar
+              </a>
+            ) : null}
+          </form>
+          {filteredLogs.length === 0 ? (
+            <p className="mt-3 text-sm text-slate-500">
+              {allLogsArray.length === 0
+                ? "Nenhum lançamento ainda."
+                : "Nenhum lançamento encontrado para este usuário."}
+            </p>
           ) : (
             <ul className="mt-3 space-y-2 max-h-[320px] overflow-y-auto">
-              {allLogs.map((log) => (
+              {filteredLogs.map((log) => (
                 <li
                   key={log.id}
                   className="flex items-start justify-between gap-2 rounded-lg border border-white/5 bg-slate-800/30 px-3 py-2 text-sm"

@@ -4,7 +4,7 @@ import { requireRole } from "@/lib/with-role";
 import { ROLES } from "@/lib/rbac";
 
 type ConfigPageProps = {
-  searchParams: Promise<{ tab?: string; ano?: string; mes?: string }>;
+  searchParams: Promise<{ tab?: string; ano?: string; mes?: string; usuario?: string }>;
 };
 
 export default async function ConfigPage({ searchParams }: ConfigPageProps) {
@@ -24,7 +24,7 @@ export default async function ConfigPage({ searchParams }: ConfigPageProps) {
     tabContent = <TreinamentosAdminContent />;
   } else if (activeTab === "gamificacao") {
     const { GamificacaoAdminContent } = await import("./gamificacao/GamificacaoAdminContent");
-    tabContent = <GamificacaoAdminContent />;
+    tabContent = <GamificacaoAdminContent usuarioFiltro={params.usuario} />;
   } else if (activeTab === "relatorios") {
     const { RelatoriosAdminContent } = await import("./relatorios/RelatoriosAdminContent");
     tabContent = (

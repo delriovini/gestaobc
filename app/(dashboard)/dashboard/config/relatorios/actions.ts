@@ -7,12 +7,12 @@ import { ROLES } from "@/lib/rbac";
 
 export type RelatorioStaffInput = {
   staff_id: string;
-  tickets_geral: number;
-  tickets_security: number;
-  tickets_otimizacao: number;
-  allowlists: number;
-  horas_conectadas: number;
-  denuncias: number;
+  tickets_geral?: number | null;
+  tickets_security?: number | null;
+  tickets_otimizacao?: number | null;
+  allowlists?: number | null;
+  horas_conectadas?: number | null;
+  denuncias?: number | null;
 };
 
 export async function upsertRelatoriosStaff(ano: number, mes: number, rows: RelatorioStaffInput[]) {
@@ -20,21 +20,63 @@ export async function upsertRelatoriosStaff(ano: number, mes: number, rows: Rela
   const supabase = await createClient();
 
   for (const row of rows) {
-    const { error } = await supabase.from("relatorios_staff").upsert(
-      {
+    // 1) Busca o registro atual (se existir) para este ano/mês/staff
+    const { data: existing, error: selectError } = await supabase
+      .from("relatorios_staff")
+      .select(
+        "id, tickets_geral, tickets_security, tickets_otimizacao, allowlists, horas_conectadas, denuncias"
+      )
+      .eq("ano", ano)
+      .eq("mes", mes)
+      .eq("staff_id", row.staff_id)
+      .maybeSingle();
+
+    if (selectError) {
+      return { error: selectError.message };
+    }
+
+    // 2) Monta o payload mesclando valores existentes com novos valores informados
+    const base = existing ?? {};
+    const updatePayload: Record<string, number | null> = {};
+
+    const setIfChanged = (field: keyof RelatorioStaffInput & keyof typeof base) => {
+      const newValue = row[field];
+      if (newValue == null) return; // campo não enviado no "formulário" → não mexe
+      const currentValue = (base as any)[field] as number | null | undefined;
+      if (currentValue === newValue) return; // sem alteração
+      updatePayload[field] = newValue;
+    };
+
+    setIfChanged("tickets_geral");
+    setIfChanged("tickets_security");
+    setIfChanged("tickets_otimizacao");
+    setIfChanged("allowlists");
+    setIfChanged("horas_conectadas");
+    setIfChanged("denuncias");
+
+    // Se nada mudou, segue para a próxima linha
+    if (Object.keys(updatePayload).length === 0 && existing) {
+      continue;
+    }
+
+    if (!existing) {
+      // 3a) Não existe ainda: insere um novo registro com os campos informados
+      const insertPayload = {
         ano,
         mes,
         staff_id: row.staff_id,
-        tickets_geral: row.tickets_geral,
-        tickets_security: row.tickets_security,
-        tickets_otimizacao: row.tickets_otimizacao,
-        allowlists: row.allowlists,
-        horas_conectadas: row.horas_conectadas,
-        denuncias: row.denuncias,
-      },
-      { onConflict: "ano,mes,staff_id" }
-    );
-    if (error) return { error: error.message };
+        ...updatePayload,
+      };
+      const { error: insertError } = await supabase.from("relatorios_staff").insert(insertPayload);
+      if (insertError) return { error: insertError.message };
+    } else {
+      // 3b) Já existe: atualiza apenas os campos alterados
+      const { error: updateError } = await supabase
+        .from("relatorios_staff")
+        .update(updatePayload)
+        .eq("id", (existing as any).id);
+      if (updateError) return { error: updateError.message };
+    }
   }
   revalidatePath("/dashboard/config");
   revalidatePath("/dashboard/relatorios");
@@ -50,6 +92,101 @@ export async function fecharMes(ano: number, mes: number) {
     .eq("ano", ano)
     .eq("mes", mes);
   if (error) return { error: error.message };
+  revalidatePath("/dashboard/config");
+  revalidatePath("/dashboard/relatorios");
+  return {};
+}
+
+// ----------------------
+// Configurações de Relatórios (tabela config_relatorios)
+// ----------------------
+
+// Linha da tabela config_relatorios para metas de relatórios.
+// Mantemos os campos flexíveis, mas já incluímos os exemplos principais.
+export type ConfigRelatoriosRow = {
+  id?: string;
+  tickets_geral_meta?: number | null;
+  tickets_security_meta?: number | null;
+  tickets_otimizacao_meta?: number | null;
+  allowlists_meta?: number | null;
+  horas_conectadas_meta?: number | null;
+  denuncias_meta?: number | null;
+  [key: string]: unknown;
+};
+
+/**
+ * Carrega a configuração de relatórios da tabela config_relatorios.
+ *
+ * Implementação conforme solicitado:
+ *
+ * supabase
+ *   .from("config_relatorios")
+ *   .select("*")
+ *   .single()
+ */
+export async function getConfigRelatorios() {
+  await requireRole(ROLES.GESTOR);
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("config_relatorios")
+    .select("*")
+    .single();
+
+  // Se não houver linha ainda, tratamos como "sem configuração"
+  if (error && !data) {
+    return { data: null as ConfigRelatoriosRow | null, error: error.message };
+  }
+
+  return { data: (data as ConfigRelatoriosRow | null) };
+}
+
+/**
+ * Salva configurações em config_relatorios mesclando dados existentes com novos valores.
+ *
+ * Fluxo:
+ *  - Buscar configuração atual em config_relatorios
+ *  - Mesclar valores existentes com os novos (sem zerar campos não enviados)
+ *  - Atualizar usando upsert
+ */
+export async function salvarConfigRelatorios(data: Partial<ConfigRelatoriosRow>) {
+  await requireRole(ROLES.GESTOR);
+  const supabase = await createClient();
+
+  // 1) Busca configuração atual
+  const { data: existing, error: selectError } = await supabase
+    .from("config_relatorios")
+    .select("*")
+    .single();
+
+  if (selectError && !existing) {
+    // Se for erro por não existir linha ainda, seguimos com existing = null
+    // Qualquer outro erro relevante ainda estará em selectError.message
+  } else if (selectError) {
+    return { error: selectError.message };
+  }
+
+  // 2) Limpa o objeto recebido para não sobrescrever com undefined
+  const cleanedData: Partial<ConfigRelatoriosRow> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined) {
+      (cleanedData as any)[key] = value;
+    }
+  }
+
+  // 3) Mescla valores existentes com os novos
+  const payload: ConfigRelatoriosRow = {
+    ...(existing as any),
+    ...cleanedData,
+  };
+
+  // 4) Upsert na tabela config_relatorios
+  const { error: upsertError } = await supabase
+    .from("config_relatorios")
+    .upsert(payload);
+
+  if (upsertError) return { error: upsertError.message };
+
   revalidatePath("/dashboard/config");
   revalidatePath("/dashboard/relatorios");
   return {};
