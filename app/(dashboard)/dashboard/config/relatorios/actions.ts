@@ -144,7 +144,10 @@ export async function getConfigRelatorios() {
 
   // Se não houver linha ainda, tratamos como "sem configuração"
   if (error && !data) {
-    return { data: null as ConfigRelatorios | null, error: error.message };
+    return {
+      data: null as ConfigRelatorios | null,
+      error: (error as any)?.message ?? String(error),
+    };
   }
 
   return { data: (data as ConfigRelatorios | null) };
@@ -171,7 +174,7 @@ export async function salvarConfigRelatorios(data: Partial<ConfigRelatorios>) {
   if (selectError && !existing) {
     // Se for erro por não existir linha ainda, seguimos com existing = null
   } else if (selectError) {
-    return { error: selectError.message };
+    return { error: (selectError as any)?.message ?? String(selectError) };
   }
 
   // 2) Calcula apenas os campos que realmente mudaram,
