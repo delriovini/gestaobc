@@ -37,14 +37,14 @@ export async function upsertRelatoriosStaff(ano: number, mes: number, rows: Rela
 
     // 2) Monta o payload mesclando valores existentes com novos valores informados
     const base = existing ?? {};
-    const updatePayload: Record<string, number | null> = {};
+    const updatePayload: Partial<RelatorioStaffInput> = {};
 
-    const setIfChanged = (field: keyof RelatorioStaffInput & keyof typeof base) => {
+    const setIfChanged = (field: keyof RelatorioStaffInput) => {
       const newValue = row[field];
       if (newValue == null) return; // campo não enviado no "formulário" → não mexe
       const currentValue = (base as any)[field] as number | null | undefined;
       if (currentValue === newValue) return; // sem alteração
-      updatePayload[field] = newValue;
+      (updatePayload as any)[field] = newValue;
     };
 
     setIfChanged("tickets_geral");
@@ -103,7 +103,7 @@ export async function fecharMes(ano: number, mes: number) {
 
 // Linha da tabela config_relatorios para metas de relatórios.
 // Mantemos os campos flexíveis, mas já incluímos os exemplos principais.
-export type ConfigRelatoriosRow = {
+export type ConfigRelatorios = {
   id?: string;
   tickets_geral_meta?: number | null;
   tickets_security_meta?: number | null;
@@ -113,6 +113,15 @@ export type ConfigRelatoriosRow = {
   denuncias_meta?: number | null;
   [key: string]: unknown;
 };
+
+// Campos válidos de metas na tabela config_relatorios
+export type ConfigRelatoriosFields =
+  | "tickets_geral_meta"
+  | "tickets_security_meta"
+  | "tickets_otimizacao_meta"
+  | "allowlists_meta"
+  | "horas_conectadas_meta"
+  | "denuncias_meta";
 
 /**
  * Carrega a configuração de relatórios da tabela config_relatorios.
@@ -135,10 +144,10 @@ export async function getConfigRelatorios() {
 
   // Se não houver linha ainda, tratamos como "sem configuração"
   if (error && !data) {
-    return { data: null as ConfigRelatoriosRow | null, error: error.message };
+    return { data: null as ConfigRelatorios | null, error: error.message };
   }
 
-  return { data: (data as ConfigRelatoriosRow | null) };
+  return { data: (data as ConfigRelatorios | null) };
 }
 
 /**
@@ -149,7 +158,7 @@ export async function getConfigRelatorios() {
  *  - Mesclar valores existentes com os novos (sem zerar campos não enviados)
  *  - Atualizar usando upsert
  */
-export async function salvarConfigRelatorios(data: Partial<ConfigRelatoriosRow>) {
+export async function salvarConfigRelatorios(data: Partial<ConfigRelatorios>) {
   await requireRole(ROLES.GESTOR);
   const supabase = await createClient();
 
@@ -161,23 +170,38 @@ export async function salvarConfigRelatorios(data: Partial<ConfigRelatoriosRow>)
 
   if (selectError && !existing) {
     // Se for erro por não existir linha ainda, seguimos com existing = null
-    // Qualquer outro erro relevante ainda estará em selectError.message
   } else if (selectError) {
     return { error: selectError.message };
   }
 
-  // 2) Limpa o objeto recebido para não sobrescrever com undefined
-  const cleanedData: Partial<ConfigRelatoriosRow> = {};
-  for (const [key, value] of Object.entries(data)) {
-    if (value !== undefined) {
-      (cleanedData as any)[key] = value;
-    }
+  // 2) Calcula apenas os campos que realmente mudaram,
+  //    garantindo que campos não enviados não sejam zerados.
+  const changedFields: Partial<ConfigRelatorios> = {};
+
+  const setIfChanged = (field: ConfigRelatoriosFields) => {
+    const newValue = data[field];
+    if (newValue === undefined) return; // campo não enviado → não mexe
+    const currentValue = existing ? (existing as any)[field] : undefined;
+    if (currentValue === newValue) return; // sem alteração
+    changedFields[field] = newValue;
+  };
+
+  setIfChanged("tickets_geral_meta");
+  setIfChanged("tickets_security_meta");
+  setIfChanged("tickets_otimizacao_meta");
+  setIfChanged("allowlists_meta");
+  setIfChanged("horas_conectadas_meta");
+  setIfChanged("denuncias_meta");
+
+  // Se nada mudou e não há registro existente, não há o que salvar
+  if (!existing && Object.keys(changedFields).length === 0) {
+    return {};
   }
 
-  // 3) Mescla valores existentes com os novos
-  const payload: ConfigRelatoriosRow = {
+  // 3) Mescla o registro existente (se houver) com os campos alterados
+  const payload: ConfigRelatorios = {
     ...(existing as any),
-    ...cleanedData,
+    ...changedFields,
   };
 
   // 4) Upsert na tabela config_relatorios
